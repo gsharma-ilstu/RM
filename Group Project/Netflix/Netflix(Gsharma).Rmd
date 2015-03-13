@@ -1,0 +1,216 @@
+<center> <h1> Sentiment Analysis on Netflix</h1></center>
+========================================================
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+library("twitteR")
+library("wordcloud")
+library("tm")
+library("ggplot2")
+library("reshape2")
+
+
+```
+
+
+```{r fig.width=7, fig.height=6, cache=TRUE,eval=FALSE,echo=FALSE}
+my.key <- "*************************"
+my.secret <- "**********************"
+
+cred <- OAuthFactory$new(consumerKey=my.key,
+                         consumerSecret=my.secret,
+                         requestURL='https://api.twitter.com/oauth/request_token',
+                         accessURL='https://api.twitter.com/oauth/access_token',
+                         authURL= 'https://api.twitter.com/oauth/authorize')
+
+
+
+save(cred, file="gsharma_twitter_authentication.Rdata")
+
+
+cred$handshake()
+
+```
+
+
+
+
+```{r,eval=FALSE,echo=FALSE}
+
+
+registerTwitterOAuth(cred)
+
+
+tweets <- searchTwitter("@netflix",n=200, lang="en",since='2014-11-30', until='2014-12-01')
+
+
+length(tweets)
+
+tweets.id <- sapply(tweets, function(x) x$getId())
+tweets.text <- sapply(tweets, function(x) x$getText())
+tweets.screenname <- sapply(tweets, function(x) x$getScreenName())
+tweets.isretweet <- sapply(tweets, function(x) x$getIsRetweet())
+tweets.retweeted <- sapply(tweets, function(x) x$getRetweeted())
+tweets.created <- sapply(tweets, function(x) x$getCreated())
+
+head(tweets.text)
+
+
+df <- data.frame(tweets.id, tweets.text, tweets.screenname, tweets.isretweet, tweets.retweeted, tweets.created)
+names(df) <-c("id", "text", "screenname", "isretweet", "retweeted", "created")
+write.table(df, file = "netflix.txt", append = TRUE)
+
+pos <- scan("positive-words.txt",what="character",comment.char=";")
+neg <- scan("negative-words.txt",what="character",comment.char=";")
+
+tweets.corpus <- Corpus(VectorSource(tweets.text))
+
+tweets.corpus <- tm_map(tweets.corpus, tolower) 
+tweets.corpus <- tm_map(tweets.corpus, removePunctuation)
+tweets.corpus <- tm_map(tweets.corpus, function(x) removeWords(x,stopwords()))
+
+corpus.split <- lapply(tweets.corpus,strsplit,"\\s+")
+
+matches <- lapply(corpus.split,function(x) {
+  match.pos <- match(x[[1]],pos)
+  match.neg <- match(x[[1]],neg) 
+  
+  list(length(which(!is.na(match.pos))),length(which(!is.na(match.neg))))
+})
+
+
+match.matrix <- matrix(unlist(matches),nrow=length(matches),ncol=2,byrow=T)
+
+simple.sentiment <- match.matrix[,1] - match.matrix[,2]
+
+hist(simple.sentiment)
+
+
+sum(simple.sentiment)
+
+
+
+
+```
+<marquee> <b> Author : Gunjan Sharma </b> </marquee>
+
+<h2> Part 1 </h2>
+___________________________________________________________________
+
+The total number of tweets that we recorded on each day for the sentiment analysis for netflix is <b> 200 </b>.
+</br>
+___________________________________________________________________
+
+<h2> Part 2 </h2>
+___________________________________________________________________
+
+<b> Histogram for Sentiment Analysis of Netflix on Day 1 </b1>  
+
+![Day 1](https://github.com/gsharma-ilstu/Group-Assignment-2/blob/master/histogramImages/11-24.png?raw=true)
+___________________________________________________________________
+</br>
+<b> Histogram for Sentiment Analysis of Netflix on Day 2 </b1>
+
+![Day 2](https://github.com/gsharma-ilstu/Group-Assignment-2/blob/master/histogramImages/11-25.png?raw=true)
+___________________________________________________________________
+
+</br>
+<b> Histogram for Sentiment Analysis of Netflix on Day 3 </b1>
+
+![Day 3](https://github.com/gsharma-ilstu/Group-Assignment-2/blob/master/histogramImages/11-27.png?raw=true)
+___________________________________________________________________
+
+</br>
+<b> Histogram for Sentiment Analysis of Netflix on Day 4 </b1>
+
+![Day 4](https://github.com/gsharma-ilstu/Group-Assignment-2/blob/master/histogramImages/11-28.png?raw=true)
+___________________________________________________________________
+
+</br>
+<b> Histogram for Sentiment Analysis of Netflix on Day 5 </b1>
+
+![Day 5](https://github.com/gsharma-ilstu/Group-Assignment-2/blob/master/histogramImages/11-30.png?raw=true)
+</br>
+
+___________________________________________________________________
+
+<h2> Part 3 </h2>
+___________________________________________________________________
+
+```{r eval=TRUE,echo=FALSE,message=FALSE,fig.width=12}
+x <- read.csv("Netflix.csv")
+
+d <- melt(x, id.vars="DOT")
+
+par(mfrow=c(1,2)) 
+
+p1 <- ggplot(d, aes(DOT,value, col=variable,group=1)) + xlab("Days")  + ylab("Simple Sentiment Score") + 
+   geom_line(data=d[d$variable!="VOS",],col="Red")+ ggtitle("Sentiment score based on Tweets")
+
+p2 <- ggplot(d, aes(DOT,value, col=variable,group=1))  + xlab("Days")  + ylab("Stock Price") + 
+  geom_line(data=d[d$variable!="SSS",],col="Blue")+ ggtitle("Actual Stock price")
+
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  require(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+multiplot(p1,p2,cols=2)
+```
+
+___________________________________________________________________
+
+<h2> Part 4 </h2>
+___________________________________________________________________
+
+
+```{r echo=F}
+x
+```
+
+
+
+<h3><p> The above table represents values for Sum of Sentiment Score (SSS) and Value of Stock (VOS) for each day for <u> Netflix </u>. We recorded tweets from Twitter with the official Twitter Handle of Netflix i.e "@Netflix" and then studied its impact on the actual stock prices for Netflix </p>
+
+
+<p>Looking at the two graphs above wherein the one on the left depicts the Sum of Sentiment Score deduced with the help of opinion lexicon (available <a href="http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#lexicon">here </a>) and the one on the right portrays the change in actual stock price for Netflix.
+We analysed the tweets and the sentiment score and checked how it affected the stock price on the next day.</p>
+
+
+<p>We observed that the sentiment score falls from 75 to 44 from day 1 to day 2 and so does the stock price,from 356.4 to 349.2 .Similarly, when the sentiment score rises from 44 to 108 from day 2 to day 3, the stock price rises to 350.7 by the end of that day. However, looking at the change in sentiment score for day 3 to day 4 that rises from 108 to 128, the stock price still continue to fall. Finally, when the sentiment score drops steeply on the last day of the study,the stock price takes a dip too.</p>
+
+
+<p>Hence, from the above observations we can say that Twitter can predict the stock prices upto an extent but not always.
+</p>
+</h3>
